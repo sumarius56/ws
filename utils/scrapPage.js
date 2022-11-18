@@ -3,9 +3,6 @@ const cheerio = require("cheerio");
 
 const scrapPage = async (url) => {
   return new Promise((resolve, reject) => {
-    //Results will be stored here
-    const resultsArr = [];
-    console.log(url);
     //First page results
     async function scrapPage() {
       const getData = async (url) => {
@@ -24,13 +21,21 @@ const scrapPage = async (url) => {
           return $(h3).text();
         });
 
-        titles.forEach((element, index) => {
-          const obj = {};
-          obj.title = element;
-          obj.link = links[index];
-          resultsArr.push(obj);
+        const resultsArr = await new Promise(async (resolve, reject) => {
+          const arr = [];
+          for (let i = 0; i < links.length; i++) {
+            const meta = await getMetadata(links[i]);
+            const obj = {
+              link: links[i],
+              title: titles[i],
+              ...meta,
+            };
+            arr.push(obj);
+          }
+
+          resolve(arr);
         });
-        await resolve(resultsArr);
+        resolve(resultsArr);
         console.log(resultsArr);
       };
       getData(url);
@@ -39,5 +44,32 @@ const scrapPage = async (url) => {
     scrapPage();
   });
 };
+
+async function getMetadata(link) {
+  try {
+    return await axios.get(link).then((res) => {
+      if (!res.data) return;
+      const $ = cheerio.load(res.data);
+      const metaArray = $("meta");
+      let description = "No description";
+      let keywords = "No keywords";
+      for (const element of metaArray) {
+        if (element.attribs.property === "keywords") {
+          keywords = element.attribs.content;
+        }
+        if (element.attribs.name === "keywords") {
+          keywords = element.attribs.content;
+        }
+        if (element.attribs.name === "description") {
+          description = element.attribs.content;
+        }
+      }
+      return {
+        description,
+        keywords,
+      };
+    });
+  } catch (e) {}
+}
 
 module.exports = { scrapPage };
